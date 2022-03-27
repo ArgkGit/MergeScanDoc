@@ -35,13 +35,14 @@ namespace MergeScanDoc
             MyFolderList list = (MyFolderList)DataContext;
             string sBackFolderName = BackTextBox.Text;
             string sFrontFolderName = FrontTextBox.Text;
+            bool blDelete = (bool)DeleteCheckBox.IsChecked;
 
             // リストがなくなるまでループ。処理完了するとリストから削除。
             while (list.FolderPath.Count > 0 + iFailCnt)
             {
                 await Task.Run(() =>
                 {
-                    blResult = MergeScanData(list.FolderPath[iFailCnt], list.FolderPath[iFailCnt] + @"\" + sFrontFolderName, list.FolderPath[iFailCnt] + @"\" + sBackFolderName);
+                    blResult = MergeScanData(list.FolderPath[iFailCnt], list.FolderPath[iFailCnt] + @"\" + sFrontFolderName, list.FolderPath[iFailCnt] + @"\" + sBackFolderName, blDelete);
                 });
 
                 if (blResult)
@@ -58,7 +59,7 @@ namespace MergeScanDoc
             CtrlButton(true);
         }
 
-        private bool MergeScanData(string sMergeedFolderPath, string sFrontFolderPath, string sBackFolderPath)
+        private bool MergeScanData(string sMergeedFolderPath, string sFrontFolderPath, string sBackFolderPath, bool blDelete)
         {
 
             if (!Directory.Exists(sFrontFolderPath))
@@ -101,6 +102,21 @@ namespace MergeScanDoc
                 MessageBox.Show(ex.ToString());
                 return false;
             }
+
+
+            if (blDelete)
+            {
+                try
+                {
+                    Directory.Delete(sFrontFolderPath, true);
+                    Directory.Delete(sBackFolderPath, true);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(ex.ToString());
+                }
+            }
+
             return true;
         }
 
