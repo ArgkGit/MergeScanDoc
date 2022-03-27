@@ -17,7 +17,7 @@
         AllowDrop="True"
         Drop="Window_Drop" PreviewDragOver="Window_PreviewDragOver">
     <Window.DataContext>
-        <local:MyFolderList />
+        <local:MyFolderListBox />
     </Window.DataContext>
     <TabControl Style="{StaticResource MaterialDesignNavigatilRailTabControl}" >
         <TabItem x:Name="HomeTab">
@@ -34,7 +34,7 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
-                <ListBox Grid.Row="0" x:Name="FolderList" ItemsSource="{Binding FolderPath}">
+                <ListBox Grid.Row="0" x:Name="FolderList" ItemsSource="{Binding sPath}">
                     <ListBox.ContextMenu>
                         <ContextMenu>
                             <MenuItem Click="Delete_Click" Header="削除">

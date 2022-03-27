@@ -25,42 +25,76 @@ namespace MergeScanDoc
             BuildInfo.Text = "ビルド: " + sAssemblyVersion.Split('.')[2] + "." + sAssemblyVersion.Split('.')[3];
         }
 
-
+        /// <summary>
+        /// マージボタンをクリック後の処理
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
         private async void MergeStart_Click(object sender, RoutedEventArgs e)
         {
-            bool blResult = false;
-            int iFailCnt = 0;
+            bool blResult;                  // マージ結果
+            bool blDelete;                  // マージ完了後に表面/裏面フォルダを削除する場合はtrue
+
+            int iFailCnt;                   // マージ失敗回数
+
+            string sBackFolderName;         // 表面フォルダ名
+            string sFrontFolderName;        // 裏面フォルダ名
+
+            MyFolderListBox myFolderList;   // ドラッグ・アンド・ドロップ先のListBox
+
             CtrlButton(false);
 
-            MyFolderList list = (MyFolderList)DataContext;
-            string sBackFolderName = BackTextBox.Text;
-            string sFrontFolderName = FrontTextBox.Text;
-            bool blDelete = (bool)DeleteCheckBox.IsChecked;
+            #region 初期化
+            blResult = false;
+            blDelete = (bool)DeleteCheckBox.IsChecked;
+
+            iFailCnt = 0;
+
+            sBackFolderName = BackTextBox.Text;
+            sFrontFolderName = FrontTextBox.Text;
+
+            myFolderList = (MyFolderListBox)DataContext;
+            #endregion
 
             // リストがなくなるまでループ。処理完了するとリストから削除。
-            while (list.FolderPath.Count > 0 + iFailCnt)
+            while (myFolderList.sPath.Count > 0 + iFailCnt)
             {
                 await Task.Run(() =>
                 {
-                    blResult = MergeScanData(list.FolderPath[iFailCnt], list.FolderPath[iFailCnt] + @"\" + sFrontFolderName, list.FolderPath[iFailCnt] + @"\" + sBackFolderName, blDelete);
+                    blResult = MergeScanData(myFolderList.sPath[iFailCnt],
+                                             myFolderList.sPath[iFailCnt] + @"\" + sFrontFolderName,
+                                             myFolderList.sPath[iFailCnt] + @"\" + sBackFolderName,
+                                             blDelete);
                 });
 
                 if (blResult)
                 {
-                    list.FolderPath.Remove(list.FolderPath[iFailCnt]);
+                    myFolderList.sPath.Remove(myFolderList.sPath[iFailCnt]);
                 }
                 else
                 {
                     iFailCnt++;
                 }
-                if (list.FolderPath == null) break;
+                if (myFolderList.sPath == null) break;
             }
+
             if(iFailCnt == 0) FolderListHint.Visibility = Visibility.Visible;
+
             CtrlButton(true);
         }
 
-        private bool MergeScanData(string sMergeedFolderPath, string sFrontFolderPath, string sBackFolderPath, bool blDelete)
+        /// <summary>
+        /// 表面/裏面フォルダ内のファイルをリネームし、マージする
+        /// </summary>
+        /// <param name="sMergedFolderPath">マージ先のフォルダパス</param>
+        /// <param name="sFrontFolderPath">表面フォルダパス</param>
+        /// <param name="sBackFolderPath">裏面フォルダパス</param>
+        /// <param name="blDelete">マージ完了後に表面/裏面フォルダを削除する場合はtrue</param>
+        /// <returns></returns>
+        private bool MergeScanData(string sMergedFolderPath, string sFrontFolderPath, string sBackFolderPath, bool blDelete)
         {
+            string[] sOddFilePathArr;  // 奇数ページのファイルパス格納先(ファイル名順にソートされた状態で格納)
+            string[] sEvenFilePathArr; // 偶数ページのファイルパス格納先(ファイル名順にソートされた状態で格納)
 
             if (!Directory.Exists(sFrontFolderPath))
             {
@@ -76,24 +110,26 @@ namespace MergeScanDoc
 
             try
             {
-                string[] sOddFilePath = Directory.GetFiles(sFrontFolderPath).OrderBy(name => name).ToArray();
-                string[] sEvenFilePath = Directory.GetFiles(sBackFolderPath).OrderBy(name => name).ToArray();
+                sOddFilePathArr = Directory.GetFiles(sFrontFolderPath).OrderBy(name => name).ToArray();
+                sEvenFilePathArr = Directory.GetFiles(sBackFolderPath).OrderBy(name => name).ToArray();
 
-                if (sOddFilePath.Length == sEvenFilePath.Length)
+                if (sOddFilePathArr.Length == sEvenFilePathArr.Length)
                 {
-                    for (int iFileInedx = 0; iFileInedx < sOddFilePath.Length; iFileInedx++)
+                    // トータル10ページの場合、 1, 3, 5, 7, 9ページの順にコピー
+                    for (int iFileInedx = 0; iFileInedx < sOddFilePathArr.Length; iFileInedx++)
                     {
-                        File.Copy(sOddFilePath[iFileInedx], sMergeedFolderPath + @"\" + (((iFileInedx + 1) * 2) - 1).ToString() + Path.GetExtension(sOddFilePath[iFileInedx]));
+                        File.Copy(sOddFilePathArr[iFileInedx], sMergedFolderPath + @"\" + (((iFileInedx + 1) * 2) - 1).ToString() + Path.GetExtension(sOddFilePathArr[iFileInedx]));
                     }
 
-                    for (int iFileInedx = 0; iFileInedx < sOddFilePath.Length; iFileInedx++)
+                    // トータル10ページの場合、10, 8, 6, 4, 2ページの順にコピー
+                    for (int iFileInedx = 0; iFileInedx < sOddFilePathArr.Length; iFileInedx++)
                     {
-                        File.Copy(sEvenFilePath[iFileInedx], sMergeedFolderPath + @"\" + ((sOddFilePath.Length - iFileInedx) * 2).ToString() + Path.GetExtension(sEvenFilePath[iFileInedx]));
+                        File.Copy(sEvenFilePathArr[iFileInedx], sMergedFolderPath + @"\" + ((sOddFilePathArr.Length - iFileInedx) * 2).ToString() + Path.GetExtension(sEvenFilePathArr[iFileInedx]));
                     }
                 }
                 else
                 {
-                    MessageBox.Show("下記フォルダ内の裏面/表面フォルダ内のファイル数が一致しないためスキップします\r\n" + sMergeedFolderPath);
+                    MessageBox.Show("下記フォルダ内の裏面/表面フォルダ内のファイル数が一致しないためスキップします\r\n" + sMergedFolderPath);
                     return false;
                 }
             }
@@ -121,64 +157,77 @@ namespace MergeScanDoc
         }
 
         /// <summary>
-        /// ファイルリストすべてを削除する
+        /// リストからすべてのパスを削除する
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
         private void AllDelete_Click(object sender, RoutedEventArgs e)
         {
-            MyFolderList list = (MyFolderList)DataContext;
+            MyFolderListBox myFolderList;   // ドラッグ・アンド・ドロップ先のListBox
 
-            for (int iIndex = 0; iIndex < list.FolderPath.Count;)
+            myFolderList = (MyFolderListBox)DataContext;
+
+            for (int iListIndex = 0; iListIndex < myFolderList.sPath.Count;)
             {
-                list.FolderPath.RemoveAt(iIndex);
+                myFolderList.sPath.RemoveAt(iListIndex);
             }
+
             FolderListHint.Visibility = Visibility.Visible;
         }
 
         /// <summary>
-        /// 選択されたファイルのみを削除する
+        /// リストから選択されたフォルダパスのみを削除する
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
         private void Delete_Click(object sender, RoutedEventArgs e)
         {
-            MyFolderList list = (MyFolderList)DataContext;
+            int iListIndex;                 // 選択されたListBoxのインデックス値
+            MyFolderListBox myFolderList;   // ドラッグ・アンド・ドロップ先のListBox
+
+            myFolderList = (MyFolderListBox)DataContext;
 
             if (FolderList.SelectedIndex == -1)
             {
                 return;
             }
-            int index = FolderList.SelectedIndex;
-            list.FolderPath.RemoveAt(index);
+            iListIndex = FolderList.SelectedIndex;
+            myFolderList.sPath.RemoveAt(iListIndex);
 
-            if (list.FolderPath.Count == 0)
+            if (myFolderList.sPath.Count == 0)
             {
                 FolderListHint.Visibility = Visibility.Visible;
             }
         }
 
+        /// <summary>
+        /// ドラッグ・アンド・ドロップされたときに発生するイベント
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
         private void Window_Drop(object sender, DragEventArgs e)
         {
-            MyFolderList list = this.DataContext as MyFolderList;
-            string[] sFiles = (string[])e.Data.GetData(DataFormats.FileDrop);
+            string[] sFilePathArr;          // ドラッグ・アンド・ドロップされたファイル/フォルダパス
+            MyFolderListBox myFolderList;   // ドラッグ・アンド・ドロップ先のListBox
+
+            myFolderList = (MyFolderListBox)DataContext;
+            sFilePathArr = (string[])e.Data.GetData(DataFormats.FileDrop);
 
             // ドラッグされている場合
             if (e.Data.GetDataPresent(DataFormats.FileDrop))
             {
                 // 配列分ループ
-                foreach (string sFile in sFiles)
+                foreach (string sFile in sFilePathArr)
                 {
                     // フォルダだった場合はAdd
                     if (Directory.Exists(sFile))
                     {
-                        list.FolderPath.Add(sFile);
+                        myFolderList.sPath.Add(sFile);
                     }
                 }
-
                 e.Effects = DragDropEffects.Copy;
             }
-            if(list.FolderPath.Count > 0) FolderListHint.Visibility = Visibility.Hidden;
+            if(myFolderList.sPath.Count > 0) FolderListHint.Visibility = Visibility.Hidden;
         }
         private void Window_PreviewDragOver(object sender, DragEventArgs e)
         {
@@ -193,6 +242,10 @@ namespace MergeScanDoc
             e.Handled = true;
         }
 
+        /// <summary>
+        /// ボタンの状態を切り替える
+        /// </summary>
+        /// <param name="blIsEnabled">押せなくする場合はfalse</param>
         private void CtrlButton(bool blIsEnabled)
         {
             MergeStart.IsEnabled = blIsEnabled;
@@ -202,16 +255,20 @@ namespace MergeScanDoc
             FolderList.IsEnabled = blIsEnabled;
         }
     }
-    public class MyFolderList
+
+    /// <summary>
+    /// ドラッグ・アンド・ドロップ先のListBox構造
+    /// </summary>
+    public class MyFolderListBox
     {
-        public MyFolderList()
+        public MyFolderListBox()
         {
-            FolderPath = new ObservableCollection<string>();
+            sPath = new ObservableCollection<string>();
         }
-        public ObservableCollection<string> FolderPath
+        public ObservableCollection<string> sPath
         {
             get;
             private set;
         }
     }
-    }
+}
